@@ -1,0 +1,8 @@
+{
+    "id":"reportmaker",
+    "description":"Plugin for report generation",
+    "activation": false,
+    "resources": false,
+    "cross": true,
+    "version":"5.0.0"
+}
