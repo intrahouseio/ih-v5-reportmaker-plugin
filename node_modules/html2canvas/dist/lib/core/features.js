@@ -181,6 +181,13 @@ exports.FEATURES = {
         var value = 'withCredentials' in new XMLHttpRequest();
         Object.defineProperty(exports.FEATURES, 'SUPPORT_CORS_XHR', { value: value });
         return value;
+    },
+    get SUPPORT_NATIVE_TEXT_SEGMENTATION() {
+        'use strict';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        var value = !!(typeof Intl !== 'undefined' && Intl.Segmenter);
+        Object.defineProperty(exports.FEATURES, 'SUPPORT_NATIVE_TEXT_SEGMENTATION', { value: value });
+        return value;
     }
 };
 //# sourceMappingURL=features.js.map

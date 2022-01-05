@@ -7,3 +7,4 @@ export declare class TextBounds {
     constructor(text: string, bounds: Bounds);
 }
 export declare const parseTextBounds: (context: Context, value: string, styles: CSSParsedDeclaration, node: Text) => TextBounds[];
+export declare const segmentGraphemes: (value: string) => string[];

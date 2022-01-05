@@ -8,4 +8,5 @@ export declare const FEATURES: {
     readonly SUPPORT_CORS_IMAGES: boolean;
     readonly SUPPORT_RESPONSE_TYPE: boolean;
     readonly SUPPORT_CORS_XHR: boolean;
+    readonly SUPPORT_NATIVE_TEXT_SEGMENTATION: boolean;
 };
