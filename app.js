@@ -3,7 +3,8 @@ const fs = require('fs');
 
 const reportutil = require('./lib/reportutil');
 const makecsv = require('./lib/makecsv');
-const makepdf = require('./lib/makepdf');
+const makepdf = require('./lib/makepdfjs');
+// const makepdf = require('./lib/makepdf');
 
 module.exports = async function(plugin) {
   let client;
@@ -48,9 +49,9 @@ module.exports = async function(plugin) {
       // Сформировать отчет, записать в csv
       // const filename = await makecsv(mes.columns, res, targetFolder);
 
-      // Сформировать отчет, записать в csv
+      // Сформировать отчет, записать в pdf
       // const filename2 = await makepdf({blocks:[{block_type:'text', text:'Header'}, {block_type:'table'}]}, mes.columns, res, targetFolder);
-      // const filename2 = await makepdf(mes.content, mes.columns, res, targetFolder);
+      const filename2 = makepdf(mes.makeup_elements, mes.columns, res, targetFolder);
       // content, columns, tabledata
 
 
