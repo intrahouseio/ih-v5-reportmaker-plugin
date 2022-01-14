@@ -22,47 +22,55 @@ module.exports = async function(plugin) {
   plugin.log('Connected to ' + agentName);
 
   plugin.onCommand(async mes => {
-    plugin.log('GET COMMAND mes=' + util.inspect(mes));
+    console.log('GET COMMAND mes=' + util.inspect(mes));
     if (mes.command == 'report') return reportRequest(mes);
   });
 
-  
   async function reportRequest(mes) {
+    let respObj;
     try {
       // Подготовить запрос или запрос уже готов
-      
-      const sqlStr = client.prepareQuery(mes.filter);
+      const query = mes.sql || mes.filter;
+      console.log('before client.prepareQuery ' + util.inspect(query));
+      const sqlStr = client.prepareQuery(query);
       plugin.log('SQL: ' + sqlStr);
+      console.log('SQL: ' + sqlStr);
 
       // Выполнить запрос
-      const arr = await client.query(sqlStr);
+      let res = [];
+      if (sqlStr) {
+        const arr = await client.query(sqlStr);
+        res = reportutil.processReportResult(mes, arr);
+      }
 
-
-     const res = reportutil.processReportResult(mes, arr);
-
-      // const res = [];
-
-      console.log('res = ' + util.inspect(res));
-
-      const targetFolder = './';
+      const targetFolder = mes.targetFolder || './';
 
       // Сформировать отчет, записать в csv
       // const filename = await makecsv(mes.columns, res, targetFolder);
 
       // Сформировать отчет, записать в pdf
       // const filename2 = await makepdf({blocks:[{block_type:'text', text:'Header'}, {block_type:'table'}]}, mes.columns, res, targetFolder);
-      const filename2 = makepdf(mes.makeup_elements, mes.columns, res, targetFolder);
-      // content, columns, tabledata
+      let payload;
+      // if (mes.content == 'pdf') {
+        const filename = makepdf(mes.makeup_elements, res, targetFolder);
+        payload = {content:'pdf', filename}
+      //} else {
+      //  payload = res;
+      // }
 
-
-      // Отправить ответ
-
-      plugin.send({ id: mes.id, type: 'command', response: 1, payload: res });
+      respObj ={ id: mes.id, type: 'command', response: 1, payload };
+      
       plugin.log('SEND RESPONSE ' + util.inspect({ id: mes.id, type: 'command', response: 1 }));
     } catch (e) {
-      plugin.log('sqlclient error:' + util.inspect(e));
-   
+      respObj = { id: mes.id, type: 'command', response: 0, error:e.message };
+      plugin.log('Reportmaker error:' + util.inspect(e));
+      console.log('Reportmaker error:' + util.inspect(e));
     }
+
+    plugin.send(respObj);
+    plugin.log('SEND RESPONSE ' + util.inspect(respObj));
+    console.log('SEND RESPONSE ' + util.inspect(respObj));
+
   }
   // const res = await client.query("SELECT * from records WHERE dn='DTP102_1' AND ts>1636040466773");
   // console.log('RES='+util.inspect(res))
