@@ -1,5 +1,6 @@
 const util = require('util');
 const fs = require('fs');
+const path = require('path');
 
 const reportutil = require('./lib/reportutil');
 const makecsv = require('./lib/makecsv');
@@ -7,16 +8,13 @@ const makepdf = require('./lib/makepdfjs');
 // const makepdf = require('./lib/makepdf');
 
 module.exports = async function(plugin) {
-  let client;
-
   const { agentName, agentPath, ...opt } = plugin.params.data;
 
+  // Подключиться к БД?
   const sqlclientFilename = agentPath + '/lib/sqlclient.js';
   if (!fs.existsSync(sqlclientFilename)) throw { message: 'File not found: ' + sqlclientFilename };
-
-  // Подключиться к БД?
   const Client = require(sqlclientFilename);
-  client = new Client(opt);
+  let client = new Client(opt);
 
   await client.connect();
   plugin.log('Connected to ' + agentName);
@@ -45,24 +43,17 @@ module.exports = async function(plugin) {
 
       const targetFolder = mes.targetFolder || './';
 
-      // Сформировать отчет, записать в csv
-      // const filename = await makecsv(mes.columns, res, targetFolder);
-
-      // Сформировать отчет, записать в pdf
-      // const filename2 = await makepdf({blocks:[{block_type:'text', text:'Header'}, {block_type:'table'}]}, mes.columns, res, targetFolder);
       let payload;
       // if (mes.content == 'pdf') {
-        const filename = makepdf(mes.makeup_elements, res, targetFolder);
-        payload = {content:'pdf', filename}
-      //} else {
-      //  payload = res;
-      // }
+      const filename = path.resolve(targetFolder, mes.reportName +'_'+ Date.now() + '.pdf');
+      makepdf(mes.makeup_elements, res, filename);
+      payload = { content: 'pdf', filename };
 
-      respObj ={ id: mes.id, type: 'command', response: 1, payload };
-      
+      respObj = { id: mes.id, type: 'command', response: 1, payload };
+
       plugin.log('SEND RESPONSE ' + util.inspect({ id: mes.id, type: 'command', response: 1 }));
     } catch (e) {
-      respObj = { id: mes.id, type: 'command', response: 0, error:e.message };
+      respObj = { id: mes.id, type: 'command', response: 0, error: e.message };
       plugin.log('Reportmaker error:' + util.inspect(e));
       console.log('Reportmaker error:' + util.inspect(e));
     }
@@ -70,8 +61,5 @@ module.exports = async function(plugin) {
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
     console.log('SEND RESPONSE ' + util.inspect(respObj));
-
   }
-  // const res = await client.query("SELECT * from records WHERE dn='DTP102_1' AND ts>1636040466773");
-  // console.log('RES='+util.inspect(res))
 };

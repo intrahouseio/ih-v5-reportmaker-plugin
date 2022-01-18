@@ -7,14 +7,8 @@ const { applyPlugin } = require('../node_modules/jspdf-autotable/dist/jspdf.plug
 
 const elements = [{ type: 'table', x: 20, y: 20, w: 100, h: 300 }];
 // const tabledata = [['1', '42','24', '66'], ['1', '44','26', '70']]
-const tabledata = [
-  [
-    { content: '1', styles: { fontSize: 8, halign: 'left' } },
-    { content: '42', styles: { fontSize: 10, halign: 'left' } },
-    { content: '24', styles: { fontSize: 12, halign: 'left' } },
-    { content: '66', styles: { fontSize: 16, fontStyle: 'bold', halign: 'right' } }
-  ]
-];
+const tabledata = [];
+  
 makepdf(elements, tabledata);
 
 function makepdf(elements, tabledata, targetFolder) {
@@ -49,7 +43,7 @@ function makepdf(elements, tabledata, targetFolder) {
           addImage(el);
           break;
         case 'table':
-          // addTable(el);
+          addTable(el);
           break;
         default:
       }
@@ -100,6 +94,7 @@ function makepdf(elements, tabledata, targetFolder) {
         styles: { font: defaultFont, fontSize: 16, fontStyle: 'bold', halign: 'right', fillColor: false, textColor: 0, lineWidth: 0.1 }
       }
     ];
+    /*
     const test_tabledata = [
       [
         { content: '1', styles: { font: defaultFont, fontSize: 8, halign: 'left', lineWidth: 0.1 } },
@@ -108,6 +103,17 @@ function makepdf(elements, tabledata, targetFolder) {
         { content: '66', styles: { font: defaultFont, fontSize: 16, fontStyle: 'bold', halign: 'right', lineWidth: 0.1  } }
       ]
     ];
+    */
+   const test_tabledata = [
+    [
+      { content: '1', styles: { font: defaultFont, fontSize: 8, halign: 'left', lineWidth: 0.1 } },
+      { content: '42', styles: { font: defaultFont, font: defaultFont, fontSize: 10, halign: 'left', lineWidth: 0.1  } },
+      { content: '24', styles: { font: defaultFont, fontSize: 12, halign: 'left', lineWidth: 0.1  } },
+      { content: '66', styles: { font: defaultFont, fontSize: 16, fontStyle: 'bold', halign: 'right', lineWidth: 0.1  } }
+    ]
+  ];
+
+  const body = [['1','22','33','55']];
 
     doc.autoTable({
       startY: item.y,
@@ -123,7 +129,7 @@ function makepdf(elements, tabledata, targetFolder) {
       */
       // head: [['Дата', 'Счетчик 1', 'Счетчик 2', 'Всего']],
       head: [test_head],
-      body: test_tabledata,
+      body,
 
       /*
       footStyles: {
@@ -137,10 +143,10 @@ function makepdf(elements, tabledata, targetFolder) {
       */
       didDrawCell: data => {
         // console.log('didDrawCell data='+util.inspect(data))
-        if (data.section == 'head') {
-          console.log('didDrawCell section=' + data.section);
-          console.log('didDrawCell table=' + util.inspect(data.table));
-          console.log('didDrawCell settings=' + util.inspect(data.settings));
+        if (data.section == 'body') {
+          console.log('didDrawCell cell=' + util.inspect(data.cell));
+          console.log('didDrawCell column=' + util.inspect(data.column));
+          Object.assign(data.cell.styles, {fontSize: data.cell.styles+data.column.index*2});
         }
       }
     });
