@@ -17,6 +17,8 @@ const app = require('./app');
   } catch (e) {
     console.log('ERROR: ' + util.inspect(e));
     plugin.log('ERROR: ' + util.inspect(e));
-    plugin.exit(1);
+    setTimeout(() => {
+      plugin.exit(1)},
+    1000);
   }
 })();
