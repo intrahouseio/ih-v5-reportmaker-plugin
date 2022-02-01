@@ -1,26 +1,32 @@
+/**
+ * app.js
+ */
+
 const util = require('util');
 const fs = require('fs');
 const path = require('path');
 
+const dict = require('./dict');
 const reportutil = require('./lib/reportutil');
 const makecsv = require('./lib/makecsv');
 const makepdf = require('./lib/makepdfjs');
-// const makepdf = require('./lib/makepdf');
 
 module.exports = async function(plugin) {
   const { agentName, agentPath, ...opt } = plugin.params.data;
 
-  // Подключиться к БД?
+  // Загрузить словари (пока только months)
+  const lang = plugin.params.data.lang || 'en';
+  dict.start(path.resolve(__dirname, './locale'), lang);
+
+  // Подключиться к БД
   const sqlclientFilename = agentPath + '/lib/sqlclient.js';
   if (!fs.existsSync(sqlclientFilename)) throw { message: 'File not found: ' + sqlclientFilename };
   const Client = require(sqlclientFilename);
   let client = new Client(opt);
-
   await client.connect();
   plugin.log('Connected to ' + agentName);
 
   plugin.onCommand(async mes => {
-    console.log('GET COMMAND mes=' + util.inspect(mes));
     if (mes.command == 'report') return reportRequest(mes);
   });
 
@@ -28,13 +34,13 @@ module.exports = async function(plugin) {
     let respObj;
     try {
       // Подготовить запрос или запрос уже готов
-      const query = mes.sql || mes.filter;
-      console.log('before client.prepareQuery ' + util.inspect(query));
+      const query = mes.sql || { ...mes.filter };
+      if (query.end2) query.end = query.end2;
+     
       const sqlStr = client.prepareQuery(query);
       plugin.log('SQL: ' + sqlStr);
-      console.log('SQL: ' + sqlStr);
 
-      // Выполнить запрос
+      // Выполнить запрос, результат преобразовать в массив массивов
       let res = [];
       if (sqlStr) {
         const arr = await client.query(sqlStr);
@@ -42,15 +48,25 @@ module.exports = async function(plugin) {
       }
 
       const targetFolder = mes.targetFolder || './';
-
+      let rName = mes.reportName + '_' + Date.now();
       let payload;
-      // if (mes.content == 'pdf') {
-      const filename = path.resolve(targetFolder, mes.reportName +'_'+ Date.now() + '.pdf');
-      makepdf(mes.makeup_elements, res, filename);
-      payload = { content: 'pdf', filename };
+      let filename;
+      if (mes.content == 'pdf') {
+        filename = path.resolve(targetFolder, rName + '.pdf');
 
+        // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
+        const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, plugin);
+        makepdf(elements, res, filename);
+        console.log('MAKE PDF ' + filename);
+      } else if (mes.content == 'csv') {
+        filename = path.resolve(targetFolder, rName + '.csv');
+        makecsv(res, filename);
+      }
+
+      if (!filename) throw { message: 'Expected content: pdf, csv' };
+
+      payload = { content: mes.content, filename };
       respObj = { id: mes.id, type: 'command', response: 1, payload };
-
       plugin.log('SEND RESPONSE ' + util.inspect({ id: mes.id, type: 'command', response: 1 }));
     } catch (e) {
       respObj = { id: mes.id, type: 'command', response: 0, error: e.message };

@@ -7,10 +7,10 @@ const app = require('./app');
 (async () => {
   plugin.log('Reportmaker plugin has started.', 0);
   try {
-
+    // if (!plugin.params.agentPath) throw { message: 'No agentPath!' };
     plugin.params.data = await plugin.params.get();
  
-    plugin.log('Received params ' + JSON.stringify(plugin.params.data));
+    console.log('Received params ' + JSON.stringify(plugin.params.data));
     // if (!plugin.params.agentPath) throw { message: 'No agentPath!' };
     
     app(plugin);
