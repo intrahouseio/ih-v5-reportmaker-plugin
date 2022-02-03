@@ -31,12 +31,12 @@ module.exports = async function(plugin) {
   });
 
   async function reportRequest(mes) {
-    let respObj;
+    const respObj = { id: mes.id, type: 'command' };
     try {
       // Подготовить запрос или запрос уже готов
       const query = mes.sql || { ...mes.filter };
       if (query.end2) query.end = query.end2;
-     
+
       const sqlStr = client.prepareQuery(query);
       plugin.log('SQL: ' + sqlStr);
 
@@ -49,7 +49,6 @@ module.exports = async function(plugin) {
 
       const targetFolder = mes.targetFolder || './';
       let rName = mes.reportName + '_' + Date.now();
-      let payload;
       let filename;
       if (mes.content == 'pdf') {
         filename = path.resolve(targetFolder, rName + '.pdf');
@@ -57,25 +56,25 @@ module.exports = async function(plugin) {
         // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
         const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, plugin);
         makepdf(elements, res, filename);
-        console.log('MAKE PDF ' + filename);
+        // console.log('MAKE PDF ' + filename);
       } else if (mes.content == 'csv') {
         filename = path.resolve(targetFolder, rName + '.csv');
-        makecsv(res, filename);
-      }
+        const columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
+        if (!columns) throw { message: 'Not found table element!' };
 
+        await makecsv(columns, res, filename);
+      }
       if (!filename) throw { message: 'Expected content: pdf, csv' };
 
-      payload = { content: mes.content, filename };
-      respObj = { id: mes.id, type: 'command', response: 1, payload };
-      plugin.log('SEND RESPONSE ' + util.inspect({ id: mes.id, type: 'command', response: 1 }));
+      respObj.payload = { content: mes.content, filename };
+      respObj.response = 1;
     } catch (e) {
-      respObj = { id: mes.id, type: 'command', response: 0, error: e.message };
-      plugin.log('Reportmaker error:' + util.inspect(e));
-      console.log('Reportmaker error:' + util.inspect(e));
+      respObj.error = e.message;
+      respObj.response = 1;
     }
 
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
-    console.log('SEND RESPONSE ' + util.inspect(respObj));
+    // console.log('SEND RESPONSE ' + util.inspect(respObj));
   }
 };
