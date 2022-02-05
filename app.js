@@ -10,6 +10,7 @@ const dict = require('./dict');
 const reportutil = require('./lib/reportutil');
 const makecsv = require('./lib/makecsv');
 const makepdf = require('./lib/makepdfjs');
+const rollup = require('./lib/rollup2');
 
 module.exports = async function(plugin) {
   const { agentName, agentPath, ...opt } = plugin.params.data;
@@ -40,11 +41,17 @@ module.exports = async function(plugin) {
       const sqlStr = client.prepareQuery(query);
       plugin.log('SQL: ' + sqlStr);
 
-      // Выполнить запрос, результат преобразовать в массив массивов
-      let res = [];
+      // Выполнить запрос, 
+      let arr = [];
       if (sqlStr) {
-        const arr = await client.query(sqlStr);
-        res = reportutil.processReportResult(mes, arr);
+        arr = await client.query(sqlStr);
+        // res = reportutil.processReportResult(mes, arr);
+      }
+
+       // результат преобразовать в массив массивов
+      let res = [];
+      if (arr && arr.length && mes.reportVars && mes.reportVars.length) {
+        res = rollup(arr, mes);
       }
 
       const targetFolder = mes.targetFolder || './';
@@ -55,7 +62,7 @@ module.exports = async function(plugin) {
 
         // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
         const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, plugin);
-        makepdf(elements, res, filename);
+        makepdf(elements, res, filename, mes);
         // console.log('MAKE PDF ' + filename);
       } else if (mes.content == 'csv') {
         filename = path.resolve(targetFolder, rName + '.csv');
