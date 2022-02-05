@@ -69,12 +69,13 @@ module.exports = async function(plugin) {
       respObj.payload = { content: mes.content, filename };
       respObj.response = 1;
     } catch (e) {
-      respObj.error = e.message;
-      respObj.response = 1;
+      // console.log('ERROR: ' + util.inspect(e));
+      respObj.error = e;
+      respObj.response = 0;
     }
 
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
-    // console.log('SEND RESPONSE ' + util.inspect(respObj));
+    console.log('SEND RESPONSE ' + util.inspect(respObj));
   }
 };
