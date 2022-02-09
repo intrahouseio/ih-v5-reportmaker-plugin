@@ -41,14 +41,13 @@ module.exports = async function(plugin) {
       const sqlStr = client.prepareQuery(query);
       plugin.log('SQL: ' + sqlStr);
 
-      // Выполнить запрос, 
+      // Выполнить запрос
       let arr = [];
       if (sqlStr) {
         arr = await client.query(sqlStr);
-        // res = reportutil.processReportResult(mes, arr);
       }
 
-       // результат преобразовать в массив массивов
+      // результат преобразовать в массив массивов
       let res = [];
       if (arr && arr.length && mes.reportVars && mes.reportVars.length) {
         res = rollup(arr, mes);
@@ -56,21 +55,23 @@ module.exports = async function(plugin) {
 
       const targetFolder = mes.targetFolder || './';
       let rName = mes.reportName + '_' + Date.now();
+
       let filename;
       if (mes.content == 'pdf') {
         filename = path.resolve(targetFolder, rName + '.pdf');
-
         // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
-        const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, plugin);
+        const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, mes.reportVars);
         makepdf(elements, res, filename, mes);
         // console.log('MAKE PDF ' + filename);
+
       } else if (mes.content == 'csv') {
         filename = path.resolve(targetFolder, rName + '.csv');
         const columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
         if (!columns) throw { message: 'Not found table element!' };
 
-        await makecsv(columns, res, filename);
+        await makecsv(columns, res, filename, mes);
       }
+
       if (!filename) throw { message: 'Expected content: pdf, csv' };
 
       respObj.payload = { content: mes.content, filename };
@@ -83,6 +84,5 @@ module.exports = async function(plugin) {
 
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
-    console.log('SEND RESPONSE ' + util.inspect(respObj));
   }
 };

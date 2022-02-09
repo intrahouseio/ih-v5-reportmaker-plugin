@@ -10,7 +10,7 @@ const app = require('./app');
     // if (!plugin.params.agentPath) throw { message: 'No agentPath!' };
     plugin.params.data = await plugin.params.get();
  
-    console.log('Received params ' + JSON.stringify(plugin.params.data));
+    // console.log('Received params ' + JSON.stringify(plugin.params.data));
     // if (!plugin.params.agentPath) throw { message: 'No agentPath!' };
     
     app(plugin);
