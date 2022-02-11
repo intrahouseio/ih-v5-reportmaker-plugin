@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const dict = require('./dict');
+const hut = require('./lib/hut');
 const reportutil = require('./lib/reportutil');
 const makecsv = require('./lib/makecsv');
 const makepdf = require('./lib/makepdfjs');
@@ -34,23 +35,21 @@ module.exports = async function(plugin) {
   async function reportRequest(mes) {
     const respObj = { id: mes.id, type: 'command' };
     try {
-      // Подготовить запрос или запрос уже готов
-      const query = mes.sql || { ...mes.filter };
-      if (query.end2) query.end = query.end2;
+      let res = []; // Массив объектов для формирования отчета
 
-      const sqlStr = client.prepareQuery(query);
-      plugin.log('SQL: ' + sqlStr);
+      if (mes.process_type == 'ufun') {
+        // Запустить пользовательский обработчик
+        const filename = mes.uhandler;
+        if (!filename || !fs.existsSync(filename)) throw { message: 'Script file not found: ' + filename };
 
-      // Выполнить запрос
-      let arr = [];
-      if (sqlStr) {
-        arr = await client.query(sqlStr);
-      }
-
-      // результат преобразовать в массив массивов
-      let res = [];
-      if (arr && arr.length && mes.reportVars && mes.reportVars.length) {
-        res = rollup(arr, mes);
+        try {
+          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter);
+        } catch (e) {
+          plugin.log('Script error: ' +util.inspect(e));
+          throw { message: 'Script error: ' + hut.getShortErrStr(e)  };
+        }
+      } else {
+        res = await getRes(mes);
       }
 
       const targetFolder = mes.targetFolder || './';
@@ -59,10 +58,10 @@ module.exports = async function(plugin) {
       let filename;
       if (mes.content == 'pdf') {
         filename = path.resolve(targetFolder, rName + '.pdf');
+
         // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
         const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, mes.reportVars);
         makepdf(elements, res, filename, mes);
-        // console.log('MAKE PDF ' + filename);
 
       } else if (mes.content == 'csv') {
         filename = path.resolve(targetFolder, rName + '.csv');
@@ -77,12 +76,34 @@ module.exports = async function(plugin) {
       respObj.payload = { content: mes.content, filename };
       respObj.response = 1;
     } catch (e) {
-      // console.log('ERROR: ' + util.inspect(e));
+      console.log('ERROR: ' + util.inspect(e));
       respObj.error = e;
       respObj.response = 0;
     }
 
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
+  }
+
+  async function getRes(mes) {
+    // Подготовить запрос или запрос уже готов
+    const query = mes.sql || { ...mes.filter };
+    if (query.end2) query.end = query.end2;
+
+    const sqlStr = client.prepareQuery(query);
+    plugin.log('SQL: ' + sqlStr);
+
+    // Выполнить запрос
+    let arr = [];
+    if (sqlStr) {
+      arr = await client.query(sqlStr);
+    }
+
+    // результат преобразовать в массив объектов
+    // внутри объекта - переменные отчета со значениями
+    if (arr && arr.length && mes.reportVars && mes.reportVars.length) {
+      return rollup(arr, mes);
+    }
+    return [];
   }
 };
