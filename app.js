@@ -8,6 +8,7 @@ const path = require('path');
 
 const dict = require('./dict');
 const hut = require('./lib/hut');
+const scriptapi = require('./lib/scriptapi');
 const reportutil = require('./lib/reportutil');
 const makecsv = require('./lib/makecsv');
 const makepdf = require('./lib/makepdfjs');
@@ -42,11 +43,12 @@ module.exports = async function(plugin) {
         const filename = mes.uhandler;
         if (!filename || !fs.existsSync(filename)) throw { message: 'Script file not found: ' + filename };
 
+        hut.unrequire(filename);
         try {
-          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter);
+          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, scriptapi);
         } catch (e) {
-          plugin.log('Script error: ' +util.inspect(e));
-          throw { message: 'Script error: ' + hut.getShortErrStr(e)  };
+          plugin.log('Script error: ' + util.inspect(e));
+          throw { message: 'Script error: ' + hut.getShortErrStr(e) };
         }
       } else {
         res = await getRes(mes);
@@ -57,17 +59,16 @@ module.exports = async function(plugin) {
 
       let filename;
       if (mes.content == 'pdf') {
-        filename = path.resolve(targetFolder, rName + '.pdf');
-
         // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
         const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, mes.reportVars);
-        makepdf(elements, res, filename, mes);
 
+        filename = path.resolve(targetFolder, rName + '.pdf');
+        makepdf(elements, res, filename, mes);
       } else if (mes.content == 'csv') {
-        filename = path.resolve(targetFolder, rName + '.csv');
         const columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
         if (!columns) throw { message: 'Not found table element!' };
 
+        filename = path.resolve(targetFolder, rName + '.csv');
         await makecsv(columns, res, filename, mes);
       }
 
