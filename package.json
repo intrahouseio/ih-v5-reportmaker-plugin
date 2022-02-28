@@ -12,6 +12,7 @@
   "dependencies": {
     "image-size": "^1.0.0",
     "jspdf": "^2.5.0",
-    "jspdf-autotable": "^3.5.23"
+    "jspdf-autotable": "^3.5.23",
+    "nedb": "^1.8.0"
   }
 }
