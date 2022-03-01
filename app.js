@@ -15,11 +15,14 @@ const makepdf = require('./lib/makepdfjs');
 const rollup = require('./lib/rollup2');
 
 module.exports = async function(plugin) {
-  const { agentName, agentPath, ...opt } = plugin.params.data;
+  const { agentName, agentPath, customFolder, ...opt } = plugin.params.data;
 
   // Загрузить словари (пока только months)
   const lang = plugin.params.data.lang || 'en';
   dict.start(path.resolve(__dirname, './locale'), lang);
+
+  // Путь к пользовательским таблицам
+  scriptapi.customFolder = customFolder;
 
   // Подключиться к БД
   const sqlclientFilename = agentPath + '/lib/sqlclient.js';
