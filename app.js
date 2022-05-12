@@ -34,6 +34,7 @@ module.exports = async function(plugin) {
 
   plugin.onCommand(async mes => {
     if (mes.command == 'report') return reportRequest(mes);
+    if (mes.command == 'chart') return chartRequest(mes);
   });
 
   async function reportRequest(mes) {
@@ -109,5 +110,52 @@ module.exports = async function(plugin) {
       return rollup(arr, mes);
     }
     return [];
+  }
+
+  // Формирование данных графиков со сверткой или пользовательскими скриптами
+  async function chartRequest(mes) {
+    const respObj = { id: mes.id, type: 'command' };
+    try {
+      let res = []; // Массив объектов для формирования графика
+
+      if (mes.process_type == 'ufun') {
+        // Запустить пользовательский обработчик
+      } else {
+        res = await getChartRes(mes);
+      }
+
+      respObj.payload = res;
+      respObj.response = 1;
+    } catch (e) {
+      console.log('ERROR: ' + util.inspect(e));
+      respObj.error = e;
+      respObj.response = 0;
+    }
+
+    plugin.send(respObj);
+    plugin.log('SEND RESPONSE ' + util.inspect(respObj));
+  }
+
+  async function getChartRes(mes) {
+      // Подготовить запрос или запрос уже готов
+      const query = mes.sql || { ...mes.filter };
+      if (query.end2) query.end = query.end2;
+  
+      const sqlStr = client.prepareQuery(query);
+      plugin.log('SQL: ' + sqlStr);
+  
+      // Выполнить запрос
+      let arr = [];
+      if (sqlStr) {
+        arr = await client.query(sqlStr);
+      }
+  
+      // результат преобразовать в массив объектов
+    if (arr && arr.length) {
+        mes.trend = 1;
+        
+        return rollup(arr, mes);
+      }
+      return [];
   }
 };
