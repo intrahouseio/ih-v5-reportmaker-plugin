@@ -15,7 +15,7 @@ const makepdf = require('./lib/makepdfjs');
 const rollup = require('./lib/rollup2');
 
 module.exports = async function(plugin) {
-  const { agentName, agentPath, customFolder, ...opt } = plugin.params.data;
+  const { agentName, agentPath, customFolder, useIds, ...opt } = plugin.params.data;
 
   // Загрузить словари (пока только months)
   const lang = plugin.params.data.lang || 'en';
@@ -94,14 +94,19 @@ module.exports = async function(plugin) {
     // Подготовить запрос или запрос уже готов
     const query = mes.sql || { ...mes.filter };
     if (query.end2) query.end = query.end2;
+    query.ids = mes.ids;
 
-    const sqlStr = client.prepareQuery(query);
+    const sqlStr = client.prepareQuery(query, useIds);
     plugin.log('SQL: ' + sqlStr);
 
     // Выполнить запрос
     let arr = [];
     if (sqlStr) {
       arr = await client.query(sqlStr);
+       // Выполнить обратный маппинг id => dn, prop
+       if (useIds) {
+        arr = remap(arr, query);
+      }
     }
 
     // результат преобразовать в массив объектов
@@ -110,6 +115,33 @@ module.exports = async function(plugin) {
       return rollup(arr, mes);
     }
     return [];
+  }
+
+  function remap(arr, query) {
+    if (!query.ids || !query.dn_prop) return arr;
+
+    const idArr = query.ids.split(',');
+    const dnArr = query.dn_prop.split(',');
+    if (idArr.length != dnArr.length) return arr;
+
+    const idMap = {};
+    try {
+      for (let i = 0; i < idArr.length; i++) {
+        const intId = Number(idArr[i]);
+        const [dn, prop] = dnArr[i].split('.');
+        idMap[intId] = { dn, prop };
+      }
+      arr.forEach(item => {
+        if (item.id && idMap[item.id]) {
+          Object.assign(item, idMap[item.id]);
+        }
+      });
+    } catch (e) {
+      plugin.log(
+        'Remap error for query.ids=' + query.ids + ' query.dn_prop=' + query.dn_prop + ' : ' + util.inspect(e)
+      );
+    }
+    return arr;
   }
 
   // Формирование данных графиков со сверткой или пользовательскими скриптами
