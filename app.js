@@ -95,7 +95,7 @@ module.exports = async function(plugin) {
     const query = mes.sql || { ...mes.filter };
     if (query.end2) query.end = query.end2;
     query.ids = mes.ids;
-
+    plugin.log('query.ids: ' + query.ids);
     const sqlStr = client.prepareQuery(query, useIds);
     plugin.log('SQL: ' + sqlStr);
 
