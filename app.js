@@ -10,6 +10,7 @@ const dict = require('./dict');
 const hut = require('./lib/hut');
 const scriptapi = require('./lib/scriptapi');
 const reportutil = require('./lib/reportutil');
+const dateutils = require('./lib/dateutils');
 const makecsv = require('./lib/makecsv');
 const makepdf = require('./lib/makepdfjs');
 const rollup = require('./lib/rollup2');
@@ -34,11 +35,11 @@ module.exports = async function(plugin) {
 
   plugin.onCommand(async mes => {
     if (mes.command == 'report') return reportRequest(mes);
-    if (mes.command == 'chart') return chartRequest(mes);
   });
 
   async function reportRequest(mes) {
     const respObj = { id: mes.id, type: 'command' };
+    const uuid = mes.debug_uuid;
     try {
       let res = []; // Массив объектов для формирования отчета
 
@@ -48,10 +49,23 @@ module.exports = async function(plugin) {
         if (!filename || !fs.existsSync(filename)) throw { message: 'Script file not found: ' + filename };
 
         hut.unrequire(filename);
+        let txt = '';
         try {
-          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, scriptapi);
+          txt =
+            'Start\n reportVars =  ' +
+            util.inspect(mes.reportVars) +
+            '\n devices=  ' +
+            util.inspect(mes.devices) +
+            '\n filter =  ' +
+            util.inspect(mes.filter);
+          debug(txt);
+          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, scriptapi, debug);
+          txt = 'Stop\n result =  ' + util.inspect(res);
+          debug(txt);
         } catch (e) {
-          plugin.log('Script error: ' + util.inspect(e));
+          txt = 'Script error: ' + util.inspect(e);
+          plugin.log(txt);
+          debug(txt);
           throw { message: 'Script error: ' + hut.getShortErrStr(e) };
         }
       } else {
@@ -59,7 +73,7 @@ module.exports = async function(plugin) {
       }
 
       const targetFolder = mes.targetFolder || './';
-      let rName = mes.reportName + '_' + Date.now();
+      let rName = mes.reportName + '_f' + dateutils.getDateTimeFor(new Date(), 'created');
 
       let filename;
       if (mes.content == 'pdf') {
@@ -88,6 +102,11 @@ module.exports = async function(plugin) {
 
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
+
+    function debug(msg) {
+      if (typeof msg == 'object') msg = util.inspect(msg, null, 4);
+      plugin.send({ type: 'debug', txt: msg, uuid });
+    }
   }
 
   async function getRes(mes) {
@@ -103,8 +122,8 @@ module.exports = async function(plugin) {
     let arr = [];
     if (sqlStr) {
       arr = await client.query(sqlStr);
-       // Выполнить обратный маппинг id => dn, prop
-       if (useIds) {
+      // Выполнить обратный маппинг id => dn, prop
+      if (useIds) {
         arr = remap(arr, query);
       }
     }
@@ -142,52 +161,5 @@ module.exports = async function(plugin) {
       );
     }
     return arr;
-  }
-
-  // Формирование данных графиков со сверткой или пользовательскими скриптами
-  async function chartRequest(mes) {
-    const respObj = { id: mes.id, type: 'command' };
-    try {
-      let res = []; // Массив объектов для формирования графика
-
-      if (mes.process_type == 'ufun') {
-        // Запустить пользовательский обработчик
-      } else {
-        res = await getChartRes(mes);
-      }
-
-      respObj.payload = res;
-      respObj.response = 1;
-    } catch (e) {
-      console.log('ERROR: ' + util.inspect(e));
-      respObj.error = e;
-      respObj.response = 0;
-    }
-
-    plugin.send(respObj);
-    plugin.log('SEND RESPONSE ' + util.inspect(respObj));
-  }
-
-  async function getChartRes(mes) {
-      // Подготовить запрос или запрос уже готов
-      const query = mes.sql || { ...mes.filter };
-      if (query.end2) query.end = query.end2;
-  
-      const sqlStr = client.prepareQuery(query);
-      plugin.log('SQL: ' + sqlStr);
-  
-      // Выполнить запрос
-      let arr = [];
-      if (sqlStr) {
-        arr = await client.query(sqlStr);
-      }
-  
-      // результат преобразовать в массив объектов
-    if (arr && arr.length) {
-        mes.trend = 1;
-        
-        return rollup(arr, mes);
-      }
-      return [];
   }
 };
