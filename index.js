@@ -1,12 +1,18 @@
 const util = require('util');
-const plugin = require('ih-plugin-api')();
+// const plugin = require('ih-plugin-api')();
 
 const app = require('./app');
 
 
 (async () => {
-  plugin.log('Reportmaker plugin has started.', 0);
+ 
+  let plugin;
   try {
+    const opt = getOptFromArgs();
+    const pluginapi = opt && opt.pluginapi ? opt.pluginapi : 'ih-plugin-api';
+    plugin = require(pluginapi)();
+    plugin.log('Reportmaker plugin has started.', 0);
+    
     // if (!plugin.params.agentPath) throw { message: 'No agentPath!' };
     plugin.params.data = await plugin.params.get();
  
@@ -22,3 +28,13 @@ const app = require('./app');
     1000);
   }
 })();
+
+function getOptFromArgs() {
+  let opt;
+  try {
+    opt = JSON.parse(process.argv[2]); //
+  } catch (e) {
+    opt = {};
+  }
+  return opt;
+}
