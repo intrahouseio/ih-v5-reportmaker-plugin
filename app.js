@@ -77,11 +77,18 @@ module.exports = async function(plugin) {
 
       let filename;
       if (mes.content == 'pdf') {
-        // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
-        const elements = reportutil.processMakeupElements(mes.makeup_elements, mes.filter, res, mes.reportVars);
-
         filename = path.resolve(targetFolder, rName + '.pdf');
-        makepdf(elements, res, filename, mes);
+        // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
+        // Каждую страницу обработать отдельно
+        // mes.makeup_elements = [{id:'page_1', landscape:true/false, elements:[] }]
+        if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
+        const page_elements = [];
+        mes.makeup_elements.forEach(item => {
+          const elements = reportutil.processMakeupElements(item.elements, mes.filter, res, mes.reportVars);
+          page_elements.push({ id: item.id, landscape: item.landscape, elements });
+        });
+
+        makepdf(page_elements, res, filename, mes);
       } else if (mes.content == 'csv') {
         const columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
         if (!columns) throw { message: 'Not found table element!' };
@@ -95,7 +102,7 @@ module.exports = async function(plugin) {
       respObj.payload = { content: mes.content, filename };
       respObj.response = 1;
     } catch (e) {
-      console.log('ERROR: ' + util.inspect(e));
+      console.log('ERROR: Reportmaker. ' + util.inspect(e));
       respObj.error = e;
       respObj.response = 0;
     }
