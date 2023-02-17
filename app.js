@@ -51,13 +51,8 @@ module.exports = async function(plugin) {
         hut.unrequire(filename);
         let txt = '';
         try {
-          txt =
-            'Start\n reportVars =  ' +
-            util.inspect(mes.reportVars) +
-            '\n devices=  ' +
-            util.inspect(mes.devices) +
-            '\n filter =  ' +
-            util.inspect(mes.filter);
+          txt = 'Start';
+          // 'Start\n reportVars =  ' + util.inspect(mes.reportVars) +'\n devices=  ' +util.inspect(mes.devices) +'\n filter =  ' + util.inspect(mes.filter);
           debug(txt);
           res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, scriptapi, debug);
           txt = 'Stop\n result =  ' + util.inspect(res);
