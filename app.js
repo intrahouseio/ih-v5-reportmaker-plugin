@@ -85,9 +85,16 @@ module.exports = async function(plugin) {
 
         makepdf(page_elements, res, filename, mes);
       } else if (mes.content == 'csv') {
-        const columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
-        if (!columns) throw { message: 'Not found table element!' };
+        if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
+        let columns;
+        // Выдает первую таблицу?
+        for (const item of mes.makeup_elements) {
+          // columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
+          columns = reportutil.getTableColumnsFromMakeup(item.elements);
+          if (columns) break;
+        }
 
+        if (!columns) throw { message: 'Not found table element!' };
         filename = path.resolve(targetFolder, rName + '.csv');
         await makecsv(columns, res, filename, mes);
       }
