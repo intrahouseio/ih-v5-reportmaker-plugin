@@ -127,6 +127,8 @@ module.exports = async function(plugin) {
     if (query.end2) query.end = query.end2;
     query.ids = mes.ids;
     plugin.log('query.ids: ' + query.ids);
+    query.notnull = true; // Исключить значения null для отчетов
+
     const sqlStr = client.prepareQuery(query, useIds);
     plugin.log('SQL: ' + sqlStr);
 
