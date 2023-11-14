@@ -35,6 +35,7 @@ module.exports = async function(plugin) {
 
   plugin.onCommand(async mes => {
     if (mes.command == 'report') return reportRequest(mes);
+    if (mes.command == 'jreport') return jreportRequest(mes); // Отчет по журналу
   });
 
   async function reportRequest(mes) {
@@ -175,5 +176,64 @@ module.exports = async function(plugin) {
       );
     }
     return arr;
+  }
+
+  async function jreportRequest(mes) {
+    const respObj = { id: mes.id, type: 'command' };
+    const uuid = mes.debug_uuid;
+    try {
+      let res = mes.data; // Массив объектов для формирования отчета приходит в запросе
+      const targetFolder = mes.targetFolder || './';
+      let rName = mes.reportName + '_f' + dateutils.getDateTimeFor(new Date(), 'created');
+
+      let filename;
+      if (mes.content == 'pdf') {
+        filename = path.resolve(targetFolder, rName + '.pdf');
+        // Обработать mes.makeup_elements - отсортировать, обработать макроподстановки
+        // Каждую страницу обработать отдельно
+        // mes.makeup_elements = [{id:'page_1', landscape:true/false, elements:[] }]
+        if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
+        const page_elements = [];
+        mes.makeup_elements.forEach(item => {
+          const elements = reportutil.processMakeupElements(item.elements, mes.filter, res, mes.reportVars);
+          page_elements.push({ id: item.id, landscape: item.landscape, elements });
+        });
+
+        makepdf(page_elements, res, filename, mes);
+      } else if (mes.content == 'csv') {
+        if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
+        const tables = [];
+
+        // Выдает первую таблицу - НУЖНО выгрузить все таблицы - слева направо
+        for (const item of mes.makeup_elements) {
+          // columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
+          let columns = reportutil.getTableColumnsFromMakeup(item.elements);
+          if (columns) {
+            tables.push(columns);
+          }
+        }
+
+        if (!tables.length) throw { message: 'Not found table element!' };
+        filename = path.resolve(targetFolder, rName + '.csv');
+        await makecsv(tables, res, filename, mes);
+      }
+
+      if (!filename) throw { message: 'Expected content: pdf, csv' };
+
+      respObj.payload = { content: mes.content, filename };
+      respObj.response = 1;
+    } catch (e) {
+      console.log('ERROR: Reportmaker. ' + util.inspect(e));
+      respObj.error = e;
+      respObj.response = 0;
+    }
+
+    plugin.send(respObj);
+    plugin.log('SEND RESPONSE ' + util.inspect(respObj));
+
+    function debug(msg) {
+      if (typeof msg == 'object') msg = util.inspect(msg, null, 4);
+      plugin.send({ type: 'debug', txt: msg, uuid });
+    }
   }
 };
