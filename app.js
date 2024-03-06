@@ -35,7 +35,7 @@ module.exports = async function(plugin) {
 
   plugin.onCommand(async mes => {
     if (mes.command == 'report') return reportRequest(mes);
-    if (mes.command == 'jreport') return jreportRequest(mes); // Отчет по журналу
+    if (mes.command == 'jreport') return jreportRequest(mes);
   });
 
   async function reportRequest(mes) {
