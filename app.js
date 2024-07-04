@@ -16,15 +16,24 @@ const makepdf = require('./lib/makepdfjs');
 const rollup = require('./lib/rollup2');
 
 module.exports = async function(plugin) {
-  const { agentName, agentPath, customFolder, useIds, ...opt } = plugin.params.data;
+  const { agentName, agentPath, customFolder, jbaseFolder, useIds, ...opt } = plugin.params.data;
 
   // Загрузить словари (пока только months)
   const lang = plugin.params.data.lang || 'en';
   dict.start(path.resolve(__dirname, './locale'), lang);
 
-  // Путь к пользовательским таблицам
-  scriptapi.customFolder = customFolder;
+  plugin.apimanager.start(plugin, { customFolder, jbaseFolder, useIds });
+  
 
+  // Путь к пользовательским таблицам
+  // scriptapi.customFolder = customFolder;
+
+  Object.keys(scriptapi).forEach(prop => {
+    if (typeof scriptapi[prop] == 'function') {
+      plugin.apimanager[prop] = scriptapi[prop];
+    }
+  });
+  
   // Подключиться к БД
   const sqlclientFilename = agentPath + '/lib/sqlclient.js';
   if (!fs.existsSync(sqlclientFilename)) throw { message: 'File not found: ' + sqlclientFilename };
@@ -55,7 +64,8 @@ module.exports = async function(plugin) {
           txt = 'Start';
           // 'Start\n reportVars =  ' + util.inspect(mes.reportVars) +'\n devices=  ' +util.inspect(mes.devices) +'\n filter =  ' + util.inspect(mes.filter);
           debug(txt);
-          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, scriptapi, debug);
+          // res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, scriptapi, debug);
+          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, plugin.apimanager, debug);
           txt = 'Stop\n result =  ' + util.inspect(res);
           debug(txt);
         } catch (e) {
