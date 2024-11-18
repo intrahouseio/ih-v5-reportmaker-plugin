@@ -18,7 +18,7 @@ const rollup = require('./lib/rollup2');
 module.exports = async function(plugin) {
   const { agentName, agentPath, customFolder, jbaseFolder, useIds, ...opt } = plugin.params.data;
 
-  // Загрузить словари (пока только months)
+  // Загрузить словари 
   const lang = plugin.params.data.lang || 'en';
   dict.start(path.resolve(__dirname, './locale'), lang);
 
@@ -99,9 +99,8 @@ module.exports = async function(plugin) {
         if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
         const tables = [];
 
-        // Выдает первую таблицу - НУЖНО выгрузить все таблицы - слева направо
+        // НУЖНО выгрузить все таблицы - слева направо
         for (const item of mes.makeup_elements) {
-          // columns = reportutil.getTableColumnsFromMakeup(mes.makeup_elements);
           let columns = reportutil.getTableColumnsFromMakeup(item.elements);
           if (columns) {
             tables.push(columns);
@@ -190,7 +189,6 @@ module.exports = async function(plugin) {
 
   async function jreportRequest(mes) {
     const respObj = { id: mes.id, type: 'command' };
-    const uuid = mes.debug_uuid;
     try {
       let res = mes.data; // Массив объектов для формирования отчета приходит в запросе
       const targetFolder = mes.targetFolder || './';
@@ -240,10 +238,5 @@ module.exports = async function(plugin) {
 
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
-
-    function debug(msg) {
-      if (typeof msg == 'object') msg = util.inspect(msg, null, 4);
-      plugin.send({ type: 'debug', txt: msg, uuid });
-    }
   }
 };
