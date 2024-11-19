@@ -14,16 +14,16 @@ const dateutils = require('./lib/dateutils');
 const makecsv = require('./lib/makecsv');
 const makepdf = require('./lib/makepdfjs');
 const rollup = require('./lib/rollup2');
+const makexlsx = require('./lib/makexlsx');
 
 module.exports = async function(plugin) {
   const { agentName, agentPath, customFolder, jbaseFolder, useIds, ...opt } = plugin.params.data;
 
-  // Загрузить словари 
+  // Загрузить словари
   const lang = plugin.params.data.lang || 'en';
   dict.start(path.resolve(__dirname, './locale'), lang);
 
   plugin.apimanager.start(plugin, { customFolder, jbaseFolder, useIds });
-  
 
   // Путь к пользовательским таблицам
   // scriptapi.customFolder = customFolder;
@@ -33,7 +33,7 @@ module.exports = async function(plugin) {
       plugin.apimanager[prop] = scriptapi[prop];
     }
   });
-  
+
   // Подключиться к БД
   const sqlclientFilename = agentPath + '/lib/sqlclient.js';
   if (!fs.existsSync(sqlclientFilename)) throw { message: 'File not found: ' + sqlclientFilename };
@@ -49,6 +49,7 @@ module.exports = async function(plugin) {
 
   async function reportRequest(mes) {
     const respObj = { id: mes.id, type: 'command' };
+    plugin.log('mes = ' + util.inspect(mes));
     const uuid = mes.debug_uuid;
     try {
       let res = []; // Массив объектов для формирования отчета
@@ -110,9 +111,25 @@ module.exports = async function(plugin) {
         if (!tables.length) throw { message: 'Not found table element!' };
         filename = path.resolve(targetFolder, rName + '.csv');
         await makecsv(tables, res, filename, mes);
+      } else if (mes.content == 'xlsx') {
+        plugin.log('mes.content = ' + mes.content);
+        if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
+        const tables = [];
+
+        // НУЖНО выгрузить все таблицы - слева направо
+        for (const item of mes.makeup_elements) {
+          let columns = reportutil.getTableColumnsFromMakeup(item.elements);
+          if (columns) {
+            tables.push(columns);
+          }
+        }
+
+        if (!tables.length) throw { message: 'Not found table element!' };
+        filename = path.resolve(targetFolder, rName + '.xlsx');
+        await makexlsx(tables, res, filename, mes);
       }
 
-      if (!filename) throw { message: 'Expected content: pdf, csv' };
+      if (!filename) throw { message: 'Expected content: pdf, csv, xlsx' };
 
       respObj.payload = { content: mes.content, filename };
       respObj.response = 1;
@@ -180,9 +197,7 @@ module.exports = async function(plugin) {
         }
       });
     } catch (e) {
-      plugin.log(
-        'Remap error for query.ids=' + query.ids + ' query.dn_prop=' + query.dn_prop + ' : ' + util.inspect(e)
-      );
+      plugin.log('Remap error for query.ids=' + query.ids + ' query.dn_prop=' + query.dn_prop + ' : ' + util.inspect(e));
     }
     return arr;
   }
@@ -208,7 +223,7 @@ module.exports = async function(plugin) {
         });
 
         makepdf(page_elements, res, filename, mes);
-      } else if (mes.content == 'csv') {
+      } else if (mes.content == 'csv' || mes.content == 'xlsx') {
         if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
         const tables = [];
 
@@ -222,8 +237,16 @@ module.exports = async function(plugin) {
         }
 
         if (!tables.length) throw { message: 'Not found table element!' };
-        filename = path.resolve(targetFolder, rName + '.csv');
-        await makecsv(tables, res, filename, mes);
+        switch (mes.content) {
+          case 'csv':
+            filename = path.resolve(targetFolder, rName + '.csv');
+            await makecsv(tables, res, filename, mes);
+            break;
+          case 'xlsx':
+            filename = path.resolve(targetFolder, rName + '.xlsx');
+            await makexlsx(tables, res, filename, mes);
+            break;
+        }
       }
 
       if (!filename) throw { message: 'Expected content: pdf, csv' };
