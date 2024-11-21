@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "exceljs": "^4.4.0",
+    "exceljs-minified": "^1.0.0",
     "image-size": "^1.0.0",
     "jspdf": "^2.5.0",
     "jspdf-autotable": "^3.5.23",
