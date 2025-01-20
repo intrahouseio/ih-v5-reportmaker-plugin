@@ -10,6 +10,7 @@ const dict = require('./dict');
 const hut = require('./lib/hut');
 const scriptapi = require('./lib/scriptapi');
 const reportutil = require('./lib/reportutil');
+const aggutil = require('./lib/aggutil');
 const dateutils = require('./lib/dateutils');
 const makecsv = require('./lib/makecsv');
 const makepdf = require('./lib/makepdfjs');
@@ -25,9 +26,6 @@ module.exports = async function(plugin) {
 
   plugin.apimanager.start(plugin, { customFolder, jbaseFolder, useIds });
 
-  // Путь к пользовательским таблицам
-  // scriptapi.customFolder = customFolder;
-
   Object.keys(scriptapi).forEach(prop => {
     if (typeof scriptapi[prop] == 'function') {
       plugin.apimanager[prop] = scriptapi[prop];
@@ -37,6 +35,7 @@ module.exports = async function(plugin) {
   // Подключиться к БД
   const sqlclientFilename = agentPath + '/lib/sqlclient.js';
   if (!fs.existsSync(sqlclientFilename)) throw { message: 'File not found: ' + sqlclientFilename };
+
   const Client = require(sqlclientFilename);
   let client = new Client(opt);
   await client.connect();
@@ -49,34 +48,29 @@ module.exports = async function(plugin) {
 
   async function reportRequest(mes) {
     const respObj = { id: mes.id, type: 'command' };
-    plugin.log('mes = ' + util.inspect(mes));
     const uuid = mes.debug_uuid;
+
     try {
-      let res = []; // Массив объектов для формирования отчета
+      let res = []; // Массив объектов - данные для формирования отчета
 
       if (mes.process_type == 'ufun') {
-        // Запустить пользовательский обработчик
-        const filename = mes.uhandler;
-        if (!filename || !fs.existsSync(filename)) throw { message: 'Script file not found: ' + filename };
-
-        hut.unrequire(filename);
-        let txt = '';
-        try {
-          txt = 'Start';
-          // 'Start\n reportVars =  ' + util.inspect(mes.reportVars) +'\n devices=  ' +util.inspect(mes.devices) +'\n filter =  ' + util.inspect(mes.filter);
-          debug(txt);
-          // res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, scriptapi, debug);
-          res = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, plugin.apimanager, debug);
-          txt = 'Stop\n result =  ' + util.inspect(res);
-          debug(txt);
-        } catch (e) {
-          txt = 'Script error: ' + util.inspect(e);
-          plugin.log(txt);
-          debug(txt);
-          throw { message: 'Script error: ' + hut.getShortErrStr(e) };
+        res = runUhandler(); // Запустить пользовательский обработчик
+      } else if (mes.process_type == 'afun') {
+        // Свертка
+        if (mes.aggsql && agentName == 'sqlite') {
+           // Проверить агрегирующие функции
+          try {
+            aggutil.checkAggFunc(mes.reportVars);
+            res = await getResWithAgg(mes); // Свертка с агрегированием SQL
+          } catch (e) {
+            plugin.log(e.message);
+            res = await getRes(mes);
+          }
+        } else {
+          res = await getRes(mes);
         }
       } else {
-        res = await getRes(mes);
+        res = await getRes(mes); // ToDo - нужно без свертки ?? Или сворачивать по ms?
       }
 
       const targetFolder = mes.targetFolder || './';
@@ -146,6 +140,50 @@ module.exports = async function(plugin) {
       if (typeof msg == 'object') msg = util.inspect(msg, null, 4);
       plugin.send({ type: 'debug', txt: msg, uuid });
     }
+
+    async function runUhandler() {
+      // Запустить пользовательский обработчик
+      const filename = mes.uhandler;
+      if (!filename || !fs.existsSync(filename)) throw { message: 'Script file not found: ' + filename };
+
+      hut.unrequire(filename);
+      let txt = '';
+      try {
+        txt = 'Start';
+        // 'Start\n reportVars =  ' + util.inspect(mes.reportVars) +'\n devices=  ' +util.inspect(mes.devices) +'\n filter =  ' + util.inspect(mes.filter);
+        debug(txt);
+        const result = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, plugin.apimanager, debug);
+        txt = 'Stop\n result =  ' + util.inspect(result);
+        debug(txt);
+        return result;
+      } catch (e) {
+        txt = 'Script error: ' + util.inspect(e);
+        plugin.log(txt);
+        debug(txt);
+        throw { message: 'Script error: ' + hut.getShortErrStr(e) };
+      }
+    }
+  }
+
+  async function getResWithAgg(mes) {
+    // Пока только SQLite
+    const query = { ...mes.filter };
+    if (query.end2) query.end = query.end2;
+    query.notnull = true; 
+    query.discrete = mes.discrete;
+    query.aggs = aggutil.getAggFunc(mes.reportVars);
+
+    const sqlStr = client.prepareQueryWithAgg(query, useIds);
+    if (!sqlStr) {
+      plugin.log('prepareQueryWithAgg failed! No sqlStr');
+      return [];
+    }
+
+    plugin.log('SQL: ' + sqlStr);
+    const arr = await client.query(sqlStr);
+    plugin.log('Records: ' + arr.length);
+    // результат преобразовать в массив объектов, внутри объекта - переменные отчета со значениями
+    return aggutil.formDataForReport(arr, mes, plugin);
   }
 
   async function getRes(mes) {
@@ -172,6 +210,7 @@ module.exports = async function(plugin) {
     // результат преобразовать в массив объектов
     // внутри объекта - переменные отчета со значениями
     if (arr && arr.length && mes.reportVars && mes.reportVars.length) {
+      plugin.log('Records: ' + arr.length);
       return rollup(arr, mes);
     }
     return [];
@@ -242,14 +281,18 @@ module.exports = async function(plugin) {
             filename = path.resolve(targetFolder, rName + '.csv');
             await makecsv(tables, res, filename, mes);
             break;
+
           case 'xlsx':
             filename = path.resolve(targetFolder, rName + '.xlsx');
             await makexlsx(tables, res, filename, mes);
             break;
+
+          default:
+            throw { message: 'Expected content: pdf, csv, xlsx' };
         }
       }
 
-      if (!filename) throw { message: 'Expected content: pdf, csv' };
+      if (!filename) throw { message: 'Expected content: pdf, csv, xlsx' };
 
       respObj.payload = { content: mes.content, filename };
       respObj.response = 1;
