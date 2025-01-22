@@ -54,7 +54,7 @@ module.exports = async function(plugin) {
       let res = []; // Массив объектов - данные для формирования отчета
 
       if (mes.process_type == 'ufun') {
-        res = runUhandler(); // Запустить пользовательский обработчик
+        res = await runUhandler(); // Запустить пользовательский обработчик
       } else if (mes.process_type == 'afun') {
         // Свертка
         if (mes.aggsql && agentName == 'sqlite') {
