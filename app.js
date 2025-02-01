@@ -189,7 +189,11 @@ module.exports = async function(plugin) {
   async function getRes(mes) {
     // Подготовить запрос или запрос уже готов
     const query = mes.sql || { ...mes.filter };
-    if (query.end2) query.end = query.end2;
+    let true_end;
+    if (query.end2 && query.end2 != query.end) {
+      true_end = query.end;
+      query.end = query.end2;
+    }
     query.ids = mes.ids;
     plugin.log('query.ids: ' + query.ids);
     query.notnull = true; // Исключить значения null для отчетов
@@ -211,7 +215,12 @@ module.exports = async function(plugin) {
     // внутри объекта - переменные отчета со значениями
     if (arr && arr.length && mes.reportVars && mes.reportVars.length) {
       plugin.log('Records: ' + arr.length);
-      return rollup(arr, mes);
+      const rolled = rollup(arr, mes);
+      if (true_end && rolled.length && true_end<rolled[rolled.length-1].startTs) {
+        // Удалить последнюю запись, которую добавили для получения diff
+        rolled.pop();
+      }
+      return rolled;
     }
     return [];
   }
