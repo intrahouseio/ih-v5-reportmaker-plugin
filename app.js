@@ -58,7 +58,7 @@ module.exports = async function(plugin) {
       } else if (mes.process_type == 'afun') {
         // Свертка
         if (mes.aggsql && agentName == 'sqlite') {
-           // Проверить агрегирующие функции
+          // Проверить агрегирующие функции
           try {
             aggutil.checkAggFunc(mes.reportVars);
             res = await getResWithAgg(mes); // Свертка с агрегированием SQL
@@ -155,12 +155,15 @@ module.exports = async function(plugin) {
         const result = await require(filename)(mes.reportVars, mes.devices, client, mes.filter, plugin.apimanager, debug);
         txt = 'Stop\n result =  ' + util.inspect(result);
         debug(txt);
+        if (!result) throw { err: 'NORESULT', message: 'No result from script!' };
+        if (result.err) throw { err: result.err, message: result.err };
+        
         return result;
       } catch (e) {
-        txt = 'Script error: ' + util.inspect(e);
-        plugin.log(txt);
-        debug(txt);
-        throw { message: 'Script error: ' + hut.getShortErrStr(e) };
+        let errmsg = e.err ? e.message || e.err : 'Script error: ' + util.inspect(e);
+        plugin.log(errmsg);
+        debug(errmsg);
+        throw { message: errmsg };
       }
     }
   }
@@ -169,7 +172,7 @@ module.exports = async function(plugin) {
     // Пока только SQLite
     const query = { ...mes.filter };
     if (query.end2) query.end = query.end2;
-    query.notnull = true; 
+    query.notnull = true;
     query.discrete = mes.discrete;
     query.aggs = aggutil.getAggFunc(mes.reportVars);
 
@@ -216,7 +219,7 @@ module.exports = async function(plugin) {
     if (arr && arr.length && mes.reportVars && mes.reportVars.length) {
       plugin.log('Records: ' + arr.length);
       const rolled = rollup(arr, mes);
-      if (true_end && rolled.length && true_end<rolled[rolled.length-1].startTs) {
+      if (true_end && rolled.length && true_end < rolled[rolled.length - 1].startTs) {
         // Удалить последнюю запись, которую добавили для получения diff
         rolled.pop();
       }
