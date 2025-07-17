@@ -94,7 +94,7 @@ module.exports = async function(plugin) {
         if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
         const tables = [];
 
-        // НУЖНО выгрузить все таблицы - слева направо
+        // НУЖНО выгрузить заголовки всех таблиц - слева направо
         for (const item of mes.makeup_elements) {
           let columns = reportutil.getTableColumnsFromMakeup(item.elements);
           if (columns) {
@@ -104,22 +104,27 @@ module.exports = async function(plugin) {
 
         if (!tables.length) throw { message: 'Not found table element!' };
         filename = path.resolve(targetFolder, rName + '.csv');
+        
+        if (!Array.isArray(res)) {
+          res = makeOneArray(res);
+        }
         await makecsv(tables, res, filename, mes);
       } else if (mes.content == 'xlsx') {
         plugin.log('mes.content = ' + mes.content);
         if (!Array.isArray(mes.makeup_elements)) throw { message: 'Expected array of makeup elements' };
         const tables = [];
 
-        // НУЖНО выгрузить все таблицы - слева направо
+        // НУЖНО выгрузить все таблицы - слева направо - включая имя таблицы!
         for (const item of mes.makeup_elements) {
-          let columns = reportutil.getTableColumnsFromMakeup(item.elements);
+          let {columns, _label} = reportutil.getTableColumnsWithLabelFromMakeup(item.elements);
           if (columns) {
-            tables.push(columns);
+            tables.push({columns, _label});
           }
         }
 
         if (!tables.length) throw { message: 'Not found table element!' };
         filename = path.resolve(targetFolder, rName + '.xlsx');
+       
         await makexlsx(tables, res, filename, mes);
       }
 
@@ -157,7 +162,7 @@ module.exports = async function(plugin) {
         debug(txt);
         if (!result) throw { err: 'NORESULT', message: 'No result from script!' };
         if (result.err) throw { err: result.err, message: result.err };
-        
+
         return result;
       } catch (e) {
         let errmsg = e.err ? e.message || e.err : 'Script error: ' + util.inspect(e);
@@ -309,12 +314,37 @@ module.exports = async function(plugin) {
       respObj.payload = { content: mes.content, filename };
       respObj.response = 1;
     } catch (e) {
-      console.log('ERROR: Reportmaker. ' + util.inspect(e));
+      plugin.log('ERROR: ' + util.inspect(e));
       respObj.error = e;
       respObj.response = 0;
     }
 
     plugin.send(respObj);
     plugin.log('SEND RESPONSE ' + util.inspect(respObj));
+  }
+
+  function makeOneArray(inObj) {
+    if (typeof inObj != 'object' || !Object.keys(inObj).length) {
+      throw { message: 'Expect returned data as array or non-empty object!' };
+    }
+    const resArr = [];
+    Object.keys(inObj).forEach(table => {
+      if (Array.isArray(inObj[table])) {
+        inObj[table].forEach(item => {
+          if (typeof item == 'object') {
+            const resItem = {};
+            Object.keys(item).forEach(prop => {
+              if (typeof item[prop] == 'object') {
+                if (item[prop].value != undefined) resItem[prop] = item[prop].value;
+              } else {
+                resItem[prop] = item[prop];
+              }
+            });
+            resArr.push(resItem);
+          }
+        });
+      }
+    });
+    return resArr;
   }
 };
