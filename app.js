@@ -104,7 +104,7 @@ module.exports = async function(plugin) {
 
         if (!tables.length) throw { message: 'Not found table element!' };
         filename = path.resolve(targetFolder, rName + '.csv');
-        
+
         if (!Array.isArray(res)) {
           res = makeOneArray(res);
         }
@@ -116,15 +116,15 @@ module.exports = async function(plugin) {
 
         // НУЖНО выгрузить все таблицы - слева направо - включая имя таблицы!
         for (const item of mes.makeup_elements) {
-          let {columns, _label} = reportutil.getTableColumnsWithLabelFromMakeup(item.elements);
+          let { columns, _label } = reportutil.getTableColumnsWithLabelFromMakeup(item.elements);
           if (columns) {
-            tables.push({columns, _label});
+            tables.push({ columns, _label });
           }
         }
 
         if (!tables.length) throw { message: 'Not found table element!' };
         filename = path.resolve(targetFolder, rName + '.xlsx');
-       
+
         await makexlsx(tables, res, filename, mes);
       }
 
@@ -183,13 +183,19 @@ module.exports = async function(plugin) {
 
     const sqlStr = client.prepareQueryWithAgg(query, useIds);
     if (!sqlStr) {
-      plugin.log('prepareQueryWithAgg failed! No sqlStr');
+      plugin.log('ERROR: prepareQueryWithAgg failed! No sqlStr');
       return [];
     }
 
-    plugin.log('SQL: ' + sqlStr);
-    const arr = await client.query(sqlStr);
-    plugin.log('Records: ' + arr.length);
+    let arr = [];
+    try {
+      plugin.log('SQL: ' + sqlStr);
+      arr = await client.query(sqlStr);
+      plugin.log('Records: ' + arr.length);
+    } catch (e) {
+      plugin.log('ERROR: Query ' + sqlStr + ' rejected: ' + util.inspect(e));
+      arr = [];
+    }
     // результат преобразовать в массив объектов, внутри объекта - переменные отчета со значениями
     return aggutil.formDataForReport(arr, mes, plugin);
   }
@@ -211,12 +217,18 @@ module.exports = async function(plugin) {
 
     // Выполнить запрос
     let arr = [];
-    if (sqlStr) {
-      arr = await client.query(sqlStr);
-      // Выполнить обратный маппинг id => dn, prop
-      if (useIds) {
-        arr = remap(arr, query);
+    try {
+      if (sqlStr) {
+        arr = await client.query(sqlStr);
+        plugin.log('Records: ' + arr.length);
+        // Выполнить обратный маппинг id => dn, prop
+        if (useIds) {
+          arr = remap(arr, query);
+        }
       }
+    } catch (e) {
+      plugin.log('ERROR: Query ' + sqlStr + ' rejected: ' + util.inspect(e));
+      arr = [];
     }
 
     // результат преобразовать в массив объектов
